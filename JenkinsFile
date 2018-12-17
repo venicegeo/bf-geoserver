@@ -4,6 +4,8 @@ node {
   def root = pwd()
   def appName = "bf-geoserver"
   def serviceName = "${appName}"
+  def pcfSpace = "${SPACE}"
+  def pcfDomain = "${DOMAIN}"
 
   stage("Config") {
     // clone the configuration repository and copy the current configuration
@@ -45,16 +47,16 @@ node {
         // Deploy App
         sh "cf api ${env.PCF_API_ENDPOINT}"
         sh "cf auth ${CFUSER} ${CFPASS}"
-        sh "cf target -o ${env.PCF_ORG} -s ${env.PHASE_ONE_PCF_SPACE}"
-        sh "cf push ${appName} -f manifest.yml --hostname ${appName} -b ${env.JAVA_BUILDPACK_NAME} -d ${env.PHASE_ONE_PCF_DOMAIN}"
+        sh "cf target -o ${env.PCF_ORG} -s ${SPACE}"
+        sh "cf push ${appName} -f manifest.yml --hostname ${appName} -b ${env.JAVA_BUILDPACK_NAME} -d ${DOMAIN}"
         // Create Service if Needed
         def existStatus = sh(script: "cf service ${serviceName}", returnStatus: true)
         if (existStatus == 0) {
-          echo "${serviceName} exists in ${env.PHASE_ONE_PCF_SPACE}. Will not re-create."
+          echo "${serviceName} exists in ${SPACE}. Will not re-create. Please check that the credentials and URL match what was just pushed."
         } else {
-          echo "${serviceName} doesn't exist in ${env.PHASE_ONE_PCF_SPACE}. Re-creating."
+          echo "${serviceName} doesn't exist in ${SPACE}. Re-creating."
           sh """
-            cf cups ${serviceName} -p '{"boundless_geoserver_url": "https://${appName}.${env.PHASE_ONE_PCF_DOMAIN}/geoserver/index.html"}'
+            cf cups ${serviceName} -p '{"boundless_geoserver_url": "https://${appName}.${DOMAIN}/geoserver/index.html"}'
           """
         }
       }
