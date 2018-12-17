@@ -33,7 +33,7 @@ node {
     }
     // Download GeoServer WAR file for deploy
     sh """
-      wget http://sourceforge.net/projects/geoserver/files/GeoServer/2.14.1/geoserver-2.14.1-war.zip -O geoserver.zip
+      wget http://sourceforge.net/projects/geoserver/files/GeoServer/2.9.4/geoserver-2.9.4-war.zip -O geoserver.zip
       unzip geoserver.zip
     """
   }
