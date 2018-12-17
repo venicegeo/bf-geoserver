@@ -1,0 +1,7 @@
+applications:
+- name: bf-geoserver
+  buildpack: java_buildpack_offline
+  path: geoserver.war
+  timeout: 180
+  memory: 4G
+  disk_quota: 4G

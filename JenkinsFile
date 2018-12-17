@@ -1,0 +1,64 @@
+#!/usr/bin/groovy
+
+node {
+  def root = pwd()
+  def appName = "bf-geoserver"
+  def serviceName = "${appName}"
+
+  stage("Config") {
+    // clone the configuration repository and copy the current configuration
+    def configDir = "${root}/configuration"
+    def configFile = "${root}/config.json"
+    dir(configDir) {
+      git url: "${env.CONFIGURATION_URL}", credentialsId: "${env.CONFIGURATION_CREDS}"
+      sh "mv ${configDir}/${ENVIRONMENT}-config.json ${configFile}"
+      deleteDir()
+    }
+    // read the current configuration
+    def configJson = readJSON file: "${configFile}"
+    for (param in configJson.credparams + configJson.jobparams) { 
+      env."${param.name}" = (param.type == "booleanParam") ? "${param.defaultvalue}".toBoolean() : "${param.defaultvalue}"
+    }
+  }
+  
+  stage("Setup") {
+    deleteDir()
+    // github is open gitlab requires credentials to clone
+    if(env.USE_GIT_CREDS.toBoolean()) {
+      git url: "${env.GIT_URL}", branch: "${env.GIT_BRANCH}", credentialsId: "${env.GITLAB_CREDS}"
+    } else {
+      git url: "${env.GIT_URL}", branch: "${env.GIT_BRANCH}"
+    }
+    // Download GeoServer WAR file for deploy
+    sh """
+      wget http://sourceforge.net/projects/geoserver/files/GeoServer/2.14.1/geoserver-2.14.1-war.zip -O geoserver.zip
+      unzip geoserver.zip
+    """
+  }
+
+  stage("Deploy Service") {
+    if(!fileExists('.cf')) {
+      sh "mkdir -p .cf"
+    }
+    withEnv(['CF_HOME=.cf']) {
+      withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: "${env.PCF_CREDS}", usernameVariable: 'CFUSER', passwordVariable: 'CFPASS']]) {
+        // Deploy App
+        sh "cf api ${env.PCF_API_ENDPOINT}"
+        sh "cf auth ${CFUSER} ${CFPASS}"
+        sh "cf target -o ${env.PCF_ORG} -s ${env.PHASE_ONE_PCF_SPACE}"
+        sh "cf push ${appName} -f manifest.yml --hostname ${appName} -b ${env.JAVA_BUILDPACK_NAME} -d ${env.PHASE_ONE_PCF_DOMAIN}"
+        // Create Service if Needed
+        def existStatus = sh(script: "cf service ${serviceName}", returnStatus: true)
+        if (existStatus == 0) {
+          echo "${serviceName} exists in ${env.PHASE_ONE_PCF_SPACE}. Will not re-create."
+        } else {
+          echo "${serviceName} doesn't exist in ${env.PHASE_ONE_PCF_SPACE}. Re-creating."
+          sh """
+            cf cups ${serviceName} -p '{"boundless_geoserver_url": "https://${appName}.${env.PHASE_ONE_PCF_DOMAIN}/geoserver/index.html"}'
+          """
+        }
+      }
+    }
+  }
+  
+}
