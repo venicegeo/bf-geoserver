@@ -3,7 +3,7 @@
 node {
   def root = pwd()
   def appName = "bf-geoserver"
-  def serviceName = "${appName}"
+  def serviceName = "pz-geoserver"
   def pcfSpace = "${SPACE}"
   def pcfDomain = "${DOMAIN}"
 
